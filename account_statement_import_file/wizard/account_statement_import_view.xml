@@ -10,12 +10,13 @@
         <field name="model">account.statement.import</field>
         <field name="arch" type="xml">
             <form string="Upload Bank Statements">
-                <h2>Upload a bank statement file</h2>
+                <h2>Upload bank statement files</h2>
                 <p>Supported formats:</p>
                 <ul id="statement_format">
                     <!-- <li>xxx format</li> is added by format-specific modules -->
                 </ul>
-                <field name="statement_file" filename="statement_filename" />
+                <field name="statement_file_ids" widget="many2many_binary" />
+                <field name="statement_file" invisible="1" />
                 <field name="statement_filename" invisible="1" />
                 <footer>
                     <button

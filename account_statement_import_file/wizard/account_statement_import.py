@@ -17,10 +17,14 @@ class AccountStatementImport(models.TransientModel):
     _description = "Import Bank Statement Files"
 
     statement_file = fields.Binary(
-        required=True,
         help="Download bank statement files from your bank and upload them here.",
     )
     statement_filename = fields.Char()
+    statement_file_ids = fields.Many2many(
+        comodel_name="ir.attachment",
+        string="Bank Statement Files",
+        help="Download bank statement files from your bank and upload them here.",
+    )
 
     def _import_file(self):
         self.ensure_one()
@@ -28,9 +32,32 @@ class AccountStatementImport(models.TransientModel):
             "statement_ids": [],
             "notifications": [],  # list of text messages
         }
-        logger.info("Start to import bank statement file %s", self.statement_filename)
-        file_data = base64.b64decode(self.statement_file)
-        self.import_single_file(file_data, result)
+        files = [
+            (attachment.name, attachment.datas)
+            for attachment in self.statement_file_ids
+        ]
+        if self.statement_file:
+            files.append((self.statement_filename, self.statement_file))
+        if not files:
+            raise UserError(self.env._("Please select at least one file to import."))
+        for filename, file_content in files:
+            logger.info("Start to import bank statement file %s", filename)
+            file_result = {"statement_ids": [], "notifications": []}
+            self.with_context(statement_filename=filename).import_single_file(
+                base64.b64decode(file_content), file_result
+            )
+            result["statement_ids"].extend(file_result["statement_ids"])
+            result["notifications"].extend(file_result["notifications"])
+            if file_result["statement_ids"]:
+                attachment = self.env["ir.attachment"].create(
+                    self._prepare_create_attachment(
+                        file_result, filename=filename, file_content=file_content
+                    )
+                )
+                statements = self.env["account.bank.statement"].browse(
+                    file_result["statement_ids"]
+                )
+                statements.write({"attachment_ids": [(4, attachment.id)]})
         logger.debug("result=%s", result)
         if not result["statement_ids"]:
             raise UserError(
@@ -39,12 +66,6 @@ class AccountStatementImport(models.TransientModel):
                     "only contains already imported transactions."
                 )
             )
-        attachment = self.env["ir.attachment"].create(
-            self._prepare_create_attachment(result)
-        )
-        for statement_id in result["statement_ids"]:
-            statement = self.env["account.bank.statement"].browse(statement_id)
-            statement.write({"attachment_ids": [(4, attachment.id)]})
         return result
 
     def import_file_button(self):
@@ -70,16 +91,18 @@ class AccountStatementImport(models.TransientModel):
             return action_with_notif
         return action
 
-    def _prepare_create_attachment(self, result):
+    def _prepare_create_attachment(
+        self, result, filename=None, file_content=None
+    ):
         # Attach to first bank statement
         res_id = result["statement_ids"][0]
         st = self.env["account.bank.statement"].browse(res_id)
         vals = {
-            "name": self.statement_filename,
+            "name": filename or self.statement_filename,
             "res_id": res_id,
             "company_id": st.company_id.id,
             "res_model": "account.bank.statement",
-            "datas": self.statement_file,
+            "datas": file_content or self.statement_file,
         }
         return vals
 
@@ -89,7 +112,7 @@ class AccountStatementImport(models.TransientModel):
             parsing_data = [parsing_data]
         logger.info(
             "Bank statement file %s contains %d accounts",
-            self.statement_filename,
+            self.env.context.get("statement_filename", self.statement_filename),
             len(parsing_data),
         )
         for idx, single_statement_data in enumerate(parsing_data, start=1):
