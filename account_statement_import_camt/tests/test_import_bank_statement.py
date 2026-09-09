@@ -165,8 +165,9 @@ class TestImport(TransactionCase):
 
             self.env["account.statement.import"].create(
                 {
-                    "statement_filename": "test import",
-                    "statement_file": camt_file,
+                    "statement_file_ids": [
+                        (0, 0, {"name": "test import", "datas": camt_file}),
+                    ],
                 }
             ).import_file_button()
 

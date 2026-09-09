@@ -58,8 +58,12 @@ class TestOfxFile(common.TransactionCase):
             ofx_bin_wrong = ofx_file.read()
             wizard = self.asi_model.create(
                 {
-                    "statement_file": base64.b64encode(ofx_bin_wrong),
-                    "statement_filename": "test_ofx_wrong.ofx",
+                    "statement_file_ids": [
+                        (0, 0, {
+                            "name": "test_ofx_wrong.ofx",
+                            "datas": base64.b64encode(ofx_bin_wrong),
+                        }),
+                    ],
                 }
             )
             self.assertFalse(wizard._check_ofx(data_file=ofx_bin_wrong))
@@ -70,8 +74,12 @@ class TestOfxFile(common.TransactionCase):
             ofx_bin = ofx_file.read()
             wizard = self.asi_model.create(
                 {
-                    "statement_file": base64.b64encode(ofx_bin),
-                    "statement_filename": "test_ofx.ofx",
+                    "statement_file_ids": [
+                        (0, 0, {
+                            "name": "test_ofx.ofx",
+                            "datas": base64.b64encode(ofx_bin),
+                        }),
+                    ],
                 }
             )
             wizard.import_file_button()

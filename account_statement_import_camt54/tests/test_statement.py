@@ -45,8 +45,9 @@ class TestGenerateBankStatement(TransactionCase):
             camt_file = base64.b64encode(datafile.read())
             self.env["account.statement.import"].create(
                 {
-                    "statement_filename": "test import",
-                    "statement_file": camt_file,
+                    "statement_file_ids": [
+                        (0, 0, {"name": "test import", "datas": camt_file}),
+                    ],
                 }
             ).import_file_button()
             bank_st_record = self.env["account.bank.statement"].search(

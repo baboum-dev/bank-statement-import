@@ -40,11 +40,13 @@ class TestAccountStatementImportFile(common.TransactionCase):
             "account_statement_import_file/tests/samples/test_statement_import.txt"
         )
         file = base64.b64encode(open(f_path, "rb").read())
-        cls.import_wizard = (
-            cls.env["account.statement.import"]
-            .with_context(journal_id=cls.journal_1.id)
-            .create({"statement_file": file, "statement_filename": "Test"})
-        )
+        cls.import_wizard = cls.env["account.statement.import"].with_context(
+            journal_id=cls.journal_1.id
+        ).create({
+            "statement_file_ids": [
+                (0, 0, {"name": "Test", "datas": file}),
+            ],
+        })
 
     def test_complete_stmts_vals(self):
         # ERROR: Missing payment_ref on a transaction.

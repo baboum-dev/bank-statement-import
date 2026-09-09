@@ -16,10 +16,6 @@ class AccountStatementImport(models.TransientModel):
     _name = "account.statement.import"
     _description = "Import Bank Statement Files"
 
-    statement_file = fields.Binary(
-        help="Download bank statement files from your bank and upload them here.",
-    )
-    statement_filename = fields.Char()
     statement_file_ids = fields.Many2many(
         comodel_name="ir.attachment",
         string="Bank Statement Files",
@@ -36,14 +32,12 @@ class AccountStatementImport(models.TransientModel):
             (attachment.name, attachment.datas)
             for attachment in self.statement_file_ids
         ]
-        if self.statement_file:
-            files.append((self.statement_filename, self.statement_file))
         if not files:
             raise UserError(self.env._("Please select at least one file to import."))
         for filename, file_content in files:
             logger.info("Start to import bank statement file %s", filename)
             file_result = {"statement_ids": [], "notifications": []}
-            self.with_context(statement_filename=filename).import_single_file(
+            self.with_context(file_name=filename).import_single_file(
                 base64.b64decode(file_content), file_result
             )
             result["statement_ids"].extend(file_result["statement_ids"])
@@ -91,18 +85,16 @@ class AccountStatementImport(models.TransientModel):
             return action_with_notif
         return action
 
-    def _prepare_create_attachment(
-        self, result, filename=None, file_content=None
-    ):
+    def _prepare_create_attachment(self, result, filename, file_content):
         # Attach to first bank statement
         res_id = result["statement_ids"][0]
         st = self.env["account.bank.statement"].browse(res_id)
         vals = {
-            "name": filename or self.statement_filename,
+            "name": filename,
             "res_id": res_id,
             "company_id": st.company_id.id,
             "res_model": "account.bank.statement",
-            "datas": file_content or self.statement_file,
+            "datas": file_content,
         }
         return vals
 
@@ -112,7 +104,7 @@ class AccountStatementImport(models.TransientModel):
             parsing_data = [parsing_data]
         logger.info(
             "Bank statement file %s contains %d accounts",
-            self.env.context.get("statement_filename", self.statement_filename),
+            self.env.context.get("file_name", ""),
             len(parsing_data),
         )
         for idx, single_statement_data in enumerate(parsing_data, start=1):
